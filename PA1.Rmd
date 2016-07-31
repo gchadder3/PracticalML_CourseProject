@@ -1,0 +1,163 @@
+---
+title: "Qualitative Activity Recognition Using Weight Lifting Exercises Dataset"
+author: "George Chadderdon"
+date: "July 30, 2016"
+output: html_document
+---
+
+# Introduction
+
+In this project, we developed a classifier using the Weight Lifting Exercises 
+Dataset provided by (Velloso et al., 2013) at 
+[http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har). In the data they collected, 
+6 participants performed sets of dumbbell lifts with one of 5 styles 
+of lifting (A-E).  Style A was correct form for the lifts and B-E were 
+specific incorrect methods of lifting the dumbbell.  Inertial measurement 
+units (IMUs; 3-axis accelerometer, gyros, and magnetometer) were attached to 
+the lifter's belt, arm, forearm, and to the dumbbell being lifted.  Raw IMU 
+data and features extracted from this data were used to train a classifier 
+for styles A-E.
+
+# Data Processing
+
+First we loaded in the dplyr, caret, and rattle packages:
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(caret)
+library(rattle)
+```
+
+Then, the raw training and test set data were read in:
+
+```{r}
+trainset <- read.csv("pml-training.csv")
+testset <- read.csv("pml-testing.csv")
+```
+
+We then removed column X (the row indices):
+
+```{r}
+trainset <- select(trainset, -X)
+testset <- select(testset, -X)
+```
+
+There were a number of feature columns (e.g., `kurtosis_roll_belt`, 
+`max_roll_belt`) which have all missing values, so we excluded these columns:
+
+```{r}
+NAcols <- which(apply(is.na(testset), 2, sum) == 20)
+testset <- select(testset, -NAcols)
+trainset <- select(trainset, -NAcols)
+```
+
+We also dropped the first columns (`user_name` through `new_window`) which are 
+not predictor features:
+
+```{r}
+trainset <- select(trainset, -(user_name:num_window))
+testset <- select(testset, -(user_name:num_window))
+```
+
+We were left with 52 predictor feature columns and, in the training set, 
+a `classe` outcome column:
+
+```{r}
+colnames(trainset)
+```
+
+There were 13 features each for data taken from the belt, arm, forearm, and 
+dumbbell. These included X, Y, Z raw values for the accelerometer, gyro, 
+and magnetometer; roll, pitch, and yaw values; and a measure of total 
+acceleration.
+
+# Predictive Modeling
+
+As an initial try, we used `caret`'s `train()` command to train a CART 
+decision tree on the full training set:
+
+```{r, message=FALSE, cache=TRUE}
+set.seed(1)
+fitControl <- trainControl(method="repeatedcv", number=10, repeats=1)
+modelFit.cart <- train(classe ~ ., method="rpart", trControl=fitControl, 
+    data=trainset)
+```
+
+This tried 3 values of the `cp` parameter, and for each of these tries, 
+ran 10-fold cross-validation on the full training set. Which `cp` value was 
+chosen was selected based on which cross-validation-averaged accuracy was 
+the largest:
+
+```{r}
+modelFit.cart$results
+```
+
+Thus, `r sprintf("%.4f", modelFit.cart$bestTune[[1]])` was selected for 
+model parameter `cp`, and this model was trained on the full training set.
+
+The training set accuracy of this tree is poor:
+
+```{r, message=FALSE}
+trainPreds.cart <- predict(modelFit.cart, trainset)
+CM.cart <- confusionMatrix(trainPreds.cart, trainset$classe)
+CM.cart$overall[1]
+CM.cart$table  ## confusion matrix
+```
+
+To get some idea why the performance is so poor, the architecture of the 
+tree can be viewed using the fancyRpartPlot() function from the `rattle`  package:
+
+```{r}
+fancyRpartPlot(modelFit.cart$finalModel)
+```
+
+One source of the poor accuracy is the failure of the tree to ever return 
+a classification of D, which it could never do because this tree has no 
+leaves that classify as D.  Performance is better than chance (accuracy 0.20), 
+however, suggesting that a decision tree-based approach is not entirely 
+infeasible if the right features are used for branch-splitting
+
+With this in mind, a random forest approach was tried so that random 
+multiple decision trees could be implemented and the classification results 
+taken by majority vote on the classification of the individual trees: 
+
+```{r, message=FALSE, warning=FALSE, cache=TRUE}
+set.seed(1)
+fitControl <- trainControl(method="repeatedcv", number=10, repeats=1)
+modelFit.rf <- train(classe ~ ., method="rf", trControl=fitControl, 
+    data=trainset)
+```
+
+Again, 10-fold cross-validation was used for each parameter (`mtry`) try. 
+The following cross-validation performances were achieved:
+
+```{r}
+modelFit.rf$results
+```
+
+The final model was trained with `mtry` = 2, and the results were perfect 
+accuracy on the training set:
+
+```{r, message=FALSE, warning=FALSE}
+trainPreds.rf <- predict(modelFit.rf, trainset)
+CM.rf <- confusionMatrix(trainPreds.rf, trainset$classe)
+CM.rf$overall[1]
+CM.rf$table  ## confusion matrix
+```
+
+While perfect accuracy on the training set is no guarantee of perfect 
+accuracy on the withheld testing set, the cross-validation accuracy of 
+`r sprintf("%.3f", modelFit.rf$results[1, 2])` suggests that the 
+performance on the testing set should be very good because cross-validation 
+does a similar withholding of samples and a good performance on averge of 
+the withheld samples suggests the model will not over-fit the data.
+
+The predictions we expect to get for the 20 exemplars in the test set are:
+
+```{r}
+predict(modelFit.rf, testset)
+```
+
+# Reference
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. *Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13)*. Stuttgart, Germany: ACM SIGCHI, 2013.
