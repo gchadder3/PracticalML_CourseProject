@@ -1,7 +1,7 @@
 ---
 title: "Qualitative Activity Recognition Using Weight Lifting Exercises Dataset"
 author: "George Chadderdon"
-date: "July 30, 2016"
+date: "July 31, 2016"
 output: html_document
 ---
 
@@ -117,9 +117,9 @@ leaves that classify as D.  Performance is better than chance (accuracy 0.20),
 however, suggesting that a decision tree-based approach is not entirely 
 infeasible if the right features are used for branch-splitting
 
-With this in mind, a random forest approach was tried so that random 
-multiple decision trees could be implemented and the classification results 
-taken by majority vote on the classification of the individual trees: 
+With this in mind, a random forest approach was tried so that 500 random 
+decision trees could be implemented and the classification results 
+taken by majority vote on the classification from the individual trees: 
 
 ```{r, message=FALSE, warning=FALSE, cache=TRUE}
 set.seed(1)
@@ -135,7 +135,8 @@ The following cross-validation performances were achieved:
 modelFit.rf$results
 ```
 
-The final model was trained with `mtry` = 2, and the results were perfect 
+The final model was trained with `mtry` = 2 (2 random feature variables 
+tried at each decision tree node split), and the results were perfect 
 accuracy on the training set:
 
 ```{r, message=FALSE, warning=FALSE}
@@ -151,6 +152,17 @@ accuracy on the withheld testing set, the cross-validation accuracy of
 performance on the testing set should be very good because cross-validation 
 does a similar withholding of samples and a good performance on averge of 
 the withheld samples suggests the model will not over-fit the data.
+
+The random forest yielded the following measures of importance for the 
+52 features:
+
+```{r}
+modelFit.rf$finalModel$importance
+```
+
+The belt roll measure, the belt yaw measure, the z axis magnetometer 
+measure for the dumbbell appear to be the 3 most important features for 
+classification, as measured by mean decrease of the Gini measure.
 
 The predictions we expect to get for the 20 exemplars in the test set are:
 

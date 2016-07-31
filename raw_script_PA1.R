@@ -1,6 +1,6 @@
 ## PA1 Raw Script Code for Practical Machine Learning Course
 ##
-## Last update: 7/30/16 (George Chadderdon)
+## Last update: 7/31/16 (George Chadderdon)
 
 ## Load the dplyr package.
 library(dplyr)
@@ -108,5 +108,7 @@ bigTestPreds.rf <- predict(modelFit.rf, testset)
 #  [1] B A B A A E D B A A B C B A E E A B B B
 # All of these were correct for the quiz.
 
+## Look at variable importance values.
+modelFit.rf$finalModel$importance
 
 # modelFit <- train(classe ~ ., method="glm", family="binomial", data=trainsubset)
